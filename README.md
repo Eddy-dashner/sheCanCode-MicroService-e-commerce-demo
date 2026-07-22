@@ -6,7 +6,58 @@ service owns its own database, its own deployable JAR, and its own Dockerfile �
 
 This repo is built in strict, gated phases 
 
-## Current status: Phase 3 — product-service ✅
+## Current status: Phase 5 — order-service + checkout saga ✅
+
+The full **choreographed checkout saga** (without payment yet). Placing an order
+starts it; services react to each other's events with no central coordinator.
+
+```
+POST /orders ──► Order CREATED ──► OrderCreated event
+                                         │
+                              inventory reserves stock
+                       ┌─────────────────┴─────────────────┐
+              StockReserved                        StockReservationFailed
+                    │                                       │
+            Order CONFIRMED                          Order CANCELLED
+            + OrderConfirmed ──► inventory              + OrderCancelled ──► inventory
+              finalises reservation                       releases stock (compensation)
+```
+
+Order placement makes the system's canonical **sync call**: order → product for
+the authoritative price (circuit-breaker fallback fails *loud* — no order at an
+unknown price).
+
+```bash
+# Place an order (needs a token). Returns 201 immediately as CREATED.
+curl -X POST http://localhost:8080/orders -H "Authorization: Bearer <token>" \
+  -H 'Content-Type: application/json' \
+  -d '{"lines":[{"productId":"<uuid>","quantity":2}]}'
+
+# Poll the order to watch the saga drive it to CONFIRMED (or CANCELLED)
+curl http://localhost:8080/orders/<id> -H "Authorization: Bearer <token>"
+```
+
+## Phase 4 — inventory-service ✅
+
+Stock levels + reservations, driven by **Kafka events** (the async backbone).
+Introduces the `common-events` module (event DTOs only). inventory-service
+consumes `OrderCreated`/`OrderCancelled` and publishes `StockReserved` /
+`StockReservationFailed` / `StockReleased` / `LowStock`. Consumers are
+**idempotent** via a `processed_events` ledger.
+
+REST is used only for stock reads/seeding — reservations happen via events.
+
+```bash
+# Seed stock (admin)
+curl -X POST http://localhost:8080/inventory -H "Authorization: Bearer <token>" \
+  -H 'Content-Type: application/json' \
+  -d '{"productId":"<uuid>","quantity":10,"lowStockThreshold":2}'
+
+# Read stock
+curl http://localhost:8080/inventory/<productId> -H "Authorization: Bearer <token>"
+```
+
+## Phase 3 — product-service ✅
 
 Catalogue CRUD + the authoritative price endpoint, plus the platform's **first
 synchronous inter-service call**: `product-service → user-service` via OpenFeign,

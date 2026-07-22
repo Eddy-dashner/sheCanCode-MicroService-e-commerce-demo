@@ -31,8 +31,11 @@
         <module>config-server</module>
         <module>discovery-server</module>
         <module>api-gateway</module>
+        <module>common-events</module>
         <module>user-service</module>
         <module>product-service</module>
+        <module>inventory-service</module>
+        <module>order-service</module>
     </modules>
 
     <dependencyManagement>
