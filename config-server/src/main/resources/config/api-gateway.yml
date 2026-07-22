@@ -1,0 +1,33 @@
+server:
+  port: 8080
+
+spring:
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          # Auto-create a route for every service registered in Eureka, so a
+          # service 'foo' is reachable at /foo/**. Convenient for a learning
+          # build; in production you'd define explicit, reviewed routes.
+          enabled: true
+          lower-case-service-id: true
+      routes:
+        # Explicit route used for the Phase 1 end-to-end wiring proof:
+        # gateway -> (discovery lookup) -> discovery-server's own health.
+        - id: discovery-health
+          uri: lb://DISCOVERY-SERVER
+          predicates:
+            - Path=/wiring-check/**
+          filters:
+            - RewritePath=/wiring-check/(?<segment>.*), /actuator/${segment}
+
+        # user-service: expose clean top-level paths instead of /user-service/**.
+        - id: user-service
+          uri: lb://USER-SERVICE
+          predicates:
+            - Path=/users/**,/auth/**
+
+        - id: product-service
+          uri: lb://PRODUCT-SERVICE
+          predicates:
+            - Path=/products/**

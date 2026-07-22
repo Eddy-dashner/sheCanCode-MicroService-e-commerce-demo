@@ -1,0 +1,23 @@
+server:
+  port: 8888
+
+spring:
+  application:
+    name: config-server
+  profiles:
+    # 'native' = serve config from the local filesystem/classpath instead of a
+    # git repo. Simpler to run for a learning build; in production you'd point
+    # this at a git repository so config is versioned and auditable.
+    active: native
+  cloud:
+    config:
+      server:
+        native:
+          # Config for every OTHER service lives here, one <name>.yml per service.
+          search-locations: classpath:/config
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

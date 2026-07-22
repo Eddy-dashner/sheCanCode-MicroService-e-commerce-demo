@@ -1,0 +1,10 @@
+target/
+*.class
+.idea/
+*.iml
+.vscode/
+.DS_Store
+# Never commit secrets (rule: no secrets in the repo).
+*.env
+.env
+.claudeclaude-code-ecommerce-microservices-prompt.md

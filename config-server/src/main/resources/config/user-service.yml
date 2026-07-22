@@ -1,0 +1,22 @@
+server:
+  port: 8081
+
+spring:
+  datasource:
+    # Each service points ONLY at its own database. user-service can never see
+    # product_db, order_db, etc. — enforced by using a distinct URL per service.
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:5432/users_db
+    username: ${POSTGRES_USER:shop}
+    password: ${POSTGRES_PASSWORD:shop}
+  jpa:
+    hibernate:
+      # 'update' auto-creates tables for the learning build. In production you'd
+      # use Flyway/Liquibase migrations instead of letting Hibernate touch schema.
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

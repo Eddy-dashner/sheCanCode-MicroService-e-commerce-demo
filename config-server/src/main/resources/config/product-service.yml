@@ -1,0 +1,58 @@
+server:
+  port: 8082
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:5432/product_db
+    username: ${POSTGRES_USER:shop}
+    password: ${POSTGRES_PASSWORD:shop}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+  cloud:
+    openfeign:
+      circuitbreaker:
+        # Route Feign calls through Resilience4j so @FeignClient(fallback=...) works.
+        enabled: true
+      client:
+        config:
+          # Per-call timeouts. A sync call must never hang forever — if user-service
+          # is slow, we want to fail fast and let the circuit breaker take over.
+          user-service:
+            connect-timeout: 1000
+            read-timeout: 2000
+
+# Actuator: expose the circuit breaker's state so you can WATCH it open.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,circuitbreakers,circuitbreakerevents
+  health:
+    circuitbreakers:
+      enabled: true
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      # Instance name = Feign service id. Small numbers so the demo trips quickly.
+      user-service:
+        register-health-indicator: true
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 5            # look at the last 5 calls
+        minimum-number-of-calls: 5        # ...once we have at least 5
+        failure-rate-threshold: 50        # open if >=50% failed
+        wait-duration-in-open-state: 10s  # stay open 10s, then probe with HALF_OPEN
+        permitted-number-of-calls-in-half-open-state: 3
+  retry:
+    instances:
+      user-service:
+        max-attempts: 2                   # one retry before giving up
+        wait-duration: 200ms
+  timelimiter:
+    instances:
+      user-service:
+        timeout-duration: 3s

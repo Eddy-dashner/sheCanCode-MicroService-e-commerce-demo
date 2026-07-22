@@ -1,0 +1,31 @@
+# Shared defaults applied to EVERY service that imports config from here.
+# Service-specific files (discovery-server.yml, api-gateway.yml) override these.
+
+eureka:
+  client:
+    service-url:
+      # Overridden to a hostname inside docker-compose via the EUREKA_HOST env var.
+      defaultZone: http://${EUREKA_HOST:localhost}:8761/eureka/
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # Health + info always on; we widen this in the observability phase.
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+# Shared JWT settings. user-service ISSUES tokens with this secret; the gateway
+# VALIDATES them with the same secret. The secret itself is injected from the
+# environment (JWT_SECRET) so it is never committed. The default below is an
+# obvious dev-only placeholder, NOT a production key.
+security:
+  jwt:
+    secret: ${JWT_SECRET:dev-only-insecure-secret-change-me-min-32-bytes-long!!}
+    expiration-minutes: 60
+    issuer: user-service
+

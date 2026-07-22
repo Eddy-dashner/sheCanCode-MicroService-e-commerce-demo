@@ -1,0 +1,7 @@
+spring:
+  application:
+    name: discovery-server
+  config:
+    # Pull the rest of this service's config from the config-server. 'optional:'
+    # so the app can still start (and tell us) if config-server is briefly down.
+    import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:8888}

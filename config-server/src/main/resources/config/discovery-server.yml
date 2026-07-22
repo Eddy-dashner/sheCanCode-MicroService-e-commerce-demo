@@ -1,0 +1,9 @@
+server:
+  port: 8761
+
+# The discovery-server is itself a Eureka server, so it should NOT try to
+# register with or fetch a registry from anyone — it IS the registry.
+eureka:
+  client:
+    register-with-eureka: false
+    fetch-registry: false
