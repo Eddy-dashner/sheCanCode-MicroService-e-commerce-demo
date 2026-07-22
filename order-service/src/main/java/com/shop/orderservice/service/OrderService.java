@@ -4,6 +4,8 @@ import com.shop.events.OrderCancelledEvent;
 import com.shop.events.OrderConfirmedEvent;
 import com.shop.events.OrderCreatedEvent;
 import com.shop.events.OrderLine;
+import com.shop.events.PaymentAuthorizedEvent;
+import com.shop.events.PaymentFailedEvent;
 import com.shop.events.StockReservationFailedEvent;
 import com.shop.events.StockReservedEvent;
 import com.shop.orderservice.client.ProductClient;
@@ -91,17 +93,48 @@ public class OrderService {
         return orders.findByUserId(userId);
     }
 
-    /** Stock reserved -> confirm the order (no payment step yet). */
+    /**
+     * Stock reserved -> move to PAYMENT_PENDING and WAIT. We no longer confirm
+     * here: payment-service (which independently consumes StockReserved) will
+     * attempt the charge and publish PaymentAuthorized/PaymentFailed, which we
+     * react to below. Note order-service does not call payment — pure choreography.
+     */
     @Transactional
     public void onStockReserved(StockReservedEvent event) {
         if (alreadyProcessed(event.eventId())) return;
         orders.findById(event.orderId()).ifPresent(order -> {
             order.transitionTo(OrderStatus.STOCK_RESERVED);
+            order.transitionTo(OrderStatus.PAYMENT_PENDING);
+            orders.save(order);
+            log.info("Order {} STOCK_RESERVED -> PAYMENT_PENDING", order.getId());
+        });
+        markProcessed(event.eventId());
+    }
+
+    /** Payment authorised -> the order is finally CONFIRMED. */
+    @Transactional
+    public void onPaymentAuthorized(PaymentAuthorizedEvent event) {
+        if (alreadyProcessed(event.eventId())) return;
+        orders.findById(event.orderId()).ifPresent(order -> {
             order.transitionTo(OrderStatus.CONFIRMED);
             orders.save(order);
             publisher.publish(new OrderConfirmedEvent(
                     UUID.randomUUID(), Instant.now(), order.getId()));
-            log.info("Order {} CONFIRMED", order.getId());
+            log.info("Order {} CONFIRMED (payment authorised)", order.getId());
+        });
+        markProcessed(event.eventId());
+    }
+
+    /** Payment declined -> cancel, which compensates the stock reservation. */
+    @Transactional
+    public void onPaymentFailed(PaymentFailedEvent event) {
+        if (alreadyProcessed(event.eventId())) return;
+        orders.findById(event.orderId()).ifPresent(order -> {
+            order.cancel("Payment failed: " + event.reason());
+            orders.save(order);
+            publisher.publish(new OrderCancelledEvent(
+                    UUID.randomUUID(), Instant.now(), order.getId(), event.reason()));
+            log.info("Order {} CANCELLED (payment)", order.getId());
         });
         markProcessed(event.eventId());
     }

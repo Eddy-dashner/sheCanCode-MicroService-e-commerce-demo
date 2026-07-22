@@ -6,7 +6,33 @@ service owns its own database, its own deployable JAR, and its own Dockerfile �
 
 This repo is built in strict, gated phases 
 
-## Current status: Phase 5 — order-service + checkout saga ✅
+## Current status: Phase 6 — payment-service ✅
+
+A brand-new service dropped into the running saga. The full flow is now:
+
+```
+OrderCreated → StockReserved → PaymentAuthorized → OrderConfirmed
+                     │                │
+                     │           PaymentFailed → OrderCancelled → StockReleased
+                     └ StockReservationFailed → OrderCancelled
+```
+
+**The loose-coupling lesson — what changed to add payments:**
+- ✏️ `order-service`: added `PAYMENT_PENDING` state + a payment-events listener
+  (it genuinely needs to know payment is now a step).
+- ➕ `common-events`: two new event records (`PaymentAuthorized`, `PaymentFailed`).
+- 🆕 `payment-service`: the new service.
+- ✅ **Unchanged**: user-, product-, inventory-service. Inventory's existing
+  `OrderCancelled → StockReleased` compensation handles payment failures for free.
+
+Payments are event-driven; there is no `POST /payments`.
+Demo the failure/compensation path with an amount ending in `.66` (mock decline rule).
+
+```bash
+curl http://localhost:8080/payments/<orderId> -H "Authorization: Bearer <token>"
+```
+
+## Phase 5 — order-service + checkout saga ✅
 
 The full **choreographed checkout saga** (without payment yet). Placing an order
 starts it; services react to each other's events with no central coordinator.
