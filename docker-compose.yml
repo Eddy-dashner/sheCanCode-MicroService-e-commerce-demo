@@ -138,5 +138,53 @@ services:
       postgres:
         condition: service_healthy
 
+  inventory-service:
+    build:
+      context: .
+      args:
+        MODULE: inventory-service
+    environment:
+      CONFIG_SERVER_URL: http://config-server:8888
+      EUREKA_HOST: discovery-server
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: shop
+      POSTGRES_PASSWORD: shop
+      KAFKA_BOOTSTRAP: kafka:9092
+    ports:
+      - "8083:8083"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  order-service:
+    build:
+      context: .
+      args:
+        MODULE: order-service
+    environment:
+      CONFIG_SERVER_URL: http://config-server:8888
+      EUREKA_HOST: discovery-server
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: shop
+      POSTGRES_PASSWORD: shop
+      KAFKA_BOOTSTRAP: kafka:9092
+    ports:
+      - "8084:8084"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
 volumes:
   postgres-data:
