@@ -4,7 +4,7 @@ An e-commerce platform built as independent Spring Boot microservices. Each
 service owns its own database, its own deployable JAR, and its own Dockerfile —
 **no service ever reads another service's database.**
 
-This repo is built in strict, gated phases (see `claude-code-ecommerce-microservices-prompt.md`).
+This repo is built in strict, gated phases 
 
 ## Current status: Phase 3 — product-service ✅
 
