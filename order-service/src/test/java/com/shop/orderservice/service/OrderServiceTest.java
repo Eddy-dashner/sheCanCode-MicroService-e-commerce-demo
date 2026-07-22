@@ -3,6 +3,8 @@ package com.shop.orderservice.service;
 import com.shop.events.OrderConfirmedEvent;
 import com.shop.events.OrderCreatedEvent;
 import com.shop.events.OrderCancelledEvent;
+import com.shop.events.PaymentAuthorizedEvent;
+import com.shop.events.PaymentFailedEvent;
 import com.shop.events.StockReservationFailedEvent;
 import com.shop.events.StockReservedEvent;
 import com.shop.orderservice.client.ProductClient;
@@ -55,19 +57,53 @@ class OrderServiceTest {
         verify(publisher).publish(any(OrderCreatedEvent.class));
     }
 
-    @Test
-    void stockReserved_confirmsOrder_andPublishesConfirmed() {
-        Order order = new Order(UUID.randomUUID(),
+    private Order anOrder() {
+        return new Order(UUID.randomUUID(),
                 List.of(new com.shop.orderservice.domain.OrderItem(UUID.randomUUID(), 1, new BigDecimal("5.00"))));
-        UUID orderId = order.getId();
+    }
+
+    @Test
+    void stockReserved_movesToPaymentPending_andDoesNotConfirmYet() {
+        Order order = anOrder();
         when(processedEvents.existsById(any())).thenReturn(false);
-        when(orders.findById(orderId)).thenReturn(Optional.of(order));
+        when(orders.findById(order.getId())).thenReturn(Optional.of(order));
 
         orderService.onStockReserved(new StockReservedEvent(
-                UUID.randomUUID(), Instant.now(), orderId, UUID.randomUUID()));
+                UUID.randomUUID(), Instant.now(), order.getId(), UUID.randomUUID()));
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_PENDING);
+        // Order does not confirm on stock alone anymore — it waits for payment.
+        verify(publisher, never()).publish(any(OrderConfirmedEvent.class));
+    }
+
+    @Test
+    void paymentAuthorized_confirmsOrder_andPublishesConfirmed() {
+        Order order = anOrder();
+        order.transitionTo(OrderStatus.STOCK_RESERVED);
+        order.transitionTo(OrderStatus.PAYMENT_PENDING);
+        when(processedEvents.existsById(any())).thenReturn(false);
+        when(orders.findById(order.getId())).thenReturn(Optional.of(order));
+
+        orderService.onPaymentAuthorized(new PaymentAuthorizedEvent(
+                UUID.randomUUID(), Instant.now(), order.getId(), UUID.randomUUID(), new BigDecimal("5.00")));
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
         verify(publisher).publish(any(OrderConfirmedEvent.class));
+    }
+
+    @Test
+    void paymentFailed_cancelsOrder_andPublishesCancelled() {
+        Order order = anOrder();
+        order.transitionTo(OrderStatus.STOCK_RESERVED);
+        order.transitionTo(OrderStatus.PAYMENT_PENDING);
+        when(processedEvents.existsById(any())).thenReturn(false);
+        when(orders.findById(order.getId())).thenReturn(Optional.of(order));
+
+        orderService.onPaymentFailed(new PaymentFailedEvent(
+                UUID.randomUUID(), Instant.now(), order.getId(), "declined"));
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        verify(publisher).publish(any(OrderCancelledEvent.class));
     }
 
     @Test

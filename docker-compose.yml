@@ -186,5 +186,31 @@ services:
       kafka:
         condition: service_healthy
 
+  # NEW in Phase 6. Adding it required NO change to product/inventory/user compose
+  # entries — it just joins the event stream.
+  payment-service:
+    build:
+      context: .
+      args:
+        MODULE: payment-service
+    environment:
+      CONFIG_SERVER_URL: http://config-server:8888
+      EUREKA_HOST: discovery-server
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: shop
+      POSTGRES_PASSWORD: shop
+      KAFKA_BOOTSTRAP: kafka:9092
+    ports:
+      - "8085:8085"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
 volumes:
   postgres-data:
